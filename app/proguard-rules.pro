@@ -1,0 +1,17 @@
+-keepattributes SourceFile,LineNumberTable
+-keepattributes *Annotation*
+-keepattributes Signature
+-keepattributes InnerClasses,EnclosingMethod
+-keep class com.sonzaix.dramabos.data.** { *; }
+-keep interface com.sonzaix.dramabos.data.DramaApiService { *; }
+-keep class com.sonzaix.dramabos.viewmodel.** { *; }
+-keep class sun.misc.Unsafe { *; }
+-keep class com.google.gson.stream.** { *; }
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+-dontwarn javax.annotation.**
+-keepattributes RuntimeVisibleAnnotations
+-dontwarn kotlinx.coroutines.**
+-dontwarn androidx.**
+-keep class androidx.appcompat.widget.** { *; }
+-dontwarn androidx.media3.**

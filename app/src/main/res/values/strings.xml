@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">DramaBos</string>
+    <string name="search_placeholder">Cari drama...</string>
+    <string name="tab_for_you">For You</string>
+    <string name="tab_new">New</string>
+    <string name="tab_rank">Rank</string>
+    <string name="library_title">Library</string>
+    <string name="error_loading">Gagal memuat data</string>
+    <string name="retry">Coba Lagi</string>
+</resources>
