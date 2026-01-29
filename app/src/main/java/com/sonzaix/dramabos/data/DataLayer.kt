@@ -15,16 +15,61 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 import java.util.concurrent.TimeUnit
 
+// --- New API Data Classes ---
 
-data class MaintenanceResponse(val isMT: String)
-data class BaseResponse<T>(val success: Boolean, val data: T?, val meta: Meta? = null)
-data class Meta(val source: String?)
+data class MeloloResponse(
+    val author: String?,
+    val message: String?,
+    @SerializedName("search_data") val searchData: List<MeloloBookContainer>?,
+    @SerializedName("populer_data") val populerData: List<MeloloBookContainer>?,
+    @SerializedName("home_data") val homeData: List<MeloloBookContainer>?,
 
-data class MeloloBaseResponse<T>(
-    val code: Int,
-    val data: T?,
-    val hasmore: Boolean?
+    // Detail fields
+    @SerializedName("episode_count") val episodeCount: Int?,
+    @SerializedName("video_list") val videoList: List<MeloloEpisode>?,
+
+    // Stream fields
+    @SerializedName("video_id") val videoId: String?,
+    val duration: Double?,
+    val poster: String?,
+    @SerializedName("expire_time") val expireTime: Long?,
+    val qualities: List<MeloloStreamQuality>?
 )
+
+data class MeloloBookContainer(
+    val books: List<MeloloBook>?
+)
+
+data class MeloloBook(
+    @SerializedName("drama_name") val dramaName: String,
+    @SerializedName("drama_id") val dramaId: String,
+    val description: String?,
+    @SerializedName("create_time") val createTime: String?,
+    @SerializedName("episode_count") val episodeCount: String?,
+    @SerializedName("watch_value") val watchValue: String?,
+    @SerializedName("is_new_book") val isNewBook: String?,
+    val language: String?,
+    @SerializedName("thumb_url") val thumbUrl: String?,
+    @SerializedName("stat_infos") val statInfos: List<String>?
+)
+
+data class MeloloEpisode(
+    val episode: Int,
+    @SerializedName("video_id") val videoId: String,
+    val duration: Int,
+    val cover: String?
+)
+
+data class MeloloStreamQuality(
+    val label: String,
+    val width: Int,
+    val height: Int,
+    val bitrate: Int,
+    val codec: String,
+    val url: String
+)
+
+// --- App Internal Data Classes (Mapped) ---
 
 data class DramaListContainer(
     val list: List<DramaItem> = emptyList(),
@@ -38,58 +83,30 @@ data class DramaItem(
     val cover: String?,
     val introduction: String?,
     val playCount: String?,
-    @SerializedName(value = "chapterCount", alternate = ["chapter_count", "total_chapter", "episodes", "items_count"])
     val chapterCount: Int? = 0,
     val tags: List<String>?,
     val timestamp: Long?,
-    val source: String = "dramabox"
-)
-
-data class MeloloItem(
-    val id: String,
-    val name: String,
-    val cover: String,
-    val author: String,
-    val episodes: Int,
-    val intro: String
+    val source: String = "melolo",
+    val isNew: Boolean = false
 )
 
 data class DramaDetail(
     val bookId: String,
-    val bookName: String,
-    val cover: String,
-    val introduction: String,
+    val bookName: String, // Detail API doesn't return name, need to pass or fetch
+    val cover: String?, // Detail API doesn't return cover (only episodes cover), might need to pass
+    val introduction: String?, // Detail API doesn't return intro
     val tags: List<String>?,
     val chapterList: List<Chapter>,
-    val source: String = "dramabox"
+    val source: String = "melolo"
 )
-
-data class ChapterListResponse(val success: Boolean, val data: ChapterDataWrapper)
-data class ChapterDataWrapper(val chapterList: List<Chapter>)
 
 data class Chapter(
     val chapterId: String,
     val chapterIndex: Int,
     val chapterName: String?,
     val isCharge: Int,
-    val vid: String? = null,
+    val vid: String?,
     val durationSeconds: Int = 0
-)
-
-data class MeloloDetailRoot(
-    val code: Int,
-    val id: String?,
-    val title: String?,
-    val episodes: Int?,
-    val cover: String?,
-    val intro: String?,
-    val videos: List<MeloloVideoInfo>?
-)
-
-data class MeloloVideoInfo(
-    val vid: String,
-    val episode: Int,
-    val duration: Int
 )
 
 data class VideoData(
@@ -102,20 +119,13 @@ data class VideoData(
 
 data class VideoQuality(val quality: Int, val videoPath: String, val isDefault: Int = 0)
 
-data class MeloloVideoResponse(
-    val url: String?,
-    val backup: String?,
-    val list: List<MeloloQuality>?
-)
-data class MeloloQuality(val definition: String, val url: String)
-
 data class LastWatched(
     val bookId: String,
     val bookName: String,
     val chapterIndex: Int,
     val cover: String?,
     val timestamp: Long,
-    val source: String = "dramabox",
+    val source: String = "melolo",
     val position: Long = 0L
 )
 
@@ -123,19 +133,9 @@ data class FavoriteDrama(
     val bookId: String,
     val bookName: String,
     val cover: String?,
-    val source: String = "dramabox",
+    val source: String = "melolo",
     val totalEpisodes: Int = 0,
     val addedAt: Long = System.currentTimeMillis()
-)
-
-data class MonitorResponse(
-    val status: String,
-    val sessions: Int?,
-    val timestamp: Long?
-)
-
-data class MeloloHealthResponse(
-    val status: String
 )
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -241,47 +241,30 @@ class DramaDataStore(private val context: Context) {
 }
 
 interface DramaApiService {
-    @GET("dramabox/api/foryou/{page}?lang=in&pageSize=30") suspend fun getForYou(@Path("page") p: Int): BaseResponse<DramaListContainer>
-    @GET("dramabox/api/new/{page}?lang=in") suspend fun getNew(@Path("page") p: Int): BaseResponse<DramaListContainer>
-    @GET("dramabox/api/rank/{page}?lang=in") suspend fun getRank(@Path("page") p: Int): BaseResponse<DramaListContainer>
+    @GET("melolo/home")
+    suspend fun getHome(): MeloloResponse
 
-    @GET("dramabox/api/search/{keyword}/{page}?lang=in&pageSize=30") suspend fun searchDrama(@Path("keyword") k: String, @Path("page") p: Int): BaseResponse<DramaListContainer>
+    @GET("melolo/populer")
+    suspend fun getPopuler(): MeloloResponse
 
-    @GET("dramabox/api/suggest/{keyword}?lang=in") suspend fun getSuggestions(@Path("keyword") k: String): BaseResponse<DramaListContainer>
-    @GET("dramabox/api/drama/{bookId}?lang=in") suspend fun getDetail(@Path("bookId") id: String): BaseResponse<DramaDetail>
-    @GET("dramabox/api/chapters/{bookId}?lang=in") suspend fun getChapters(@Path("bookId") id: String): ChapterListResponse
-    @GET("dramabox/api/watch/player?lang=in") suspend fun getVideoUrl(@Query("bookId") id: String, @Query("index") idx: Int): BaseResponse<VideoData>
-    @GET("dramabox/api/monitor") suspend fun checkMonitor(): MonitorResponse
-    @GET suspend fun checkMaintenance(@Url url: String): MaintenanceResponse
-
-    @GET("melolo/api/v1/home")
-    suspend fun getMeloloHome(
-        @Query("offset") offset: Int,
-        @Query("count") count: Int = 30,
-        @Query("lang") lang: String = "id"
-    ): MeloloBaseResponse<List<MeloloItem>>
-
-    @GET("melolo/api/v1/search")
-    suspend fun searchMelolo(
+    @GET("melolo/search")
+    suspend fun search(
         @Query("q") q: String,
-        @Query("offset") offset: Int,
-        @Query("count") count: Int = 30,
-        @Query("lang") lang: String = "id"
-    ): MeloloBaseResponse<List<MeloloItem>>
+        @Query("result") result: Int = 30,
+        @Query("page") page: Int
+    ): MeloloResponse
 
-    @GET("melolo/api/v1/detail/{id}?lang=id")
-    suspend fun getMeloloDetail(@Path("id") id: String): MeloloDetailRoot
+    @GET("melolo/detail/{id}")
+    suspend fun getDetail(@Path("id") id: String): MeloloResponse
 
-    @GET("melolo/api/v1/video/{vid}?lang=id")
-    suspend fun getMeloloVideo(@Path("vid") vid: String): MeloloVideoResponse
-
-    @GET("melolo/health") suspend fun checkMeloloHealth(): MeloloHealthResponse
+    @GET("melolo/stream/{id}")
+    suspend fun getStream(@Path("id") id: String): MeloloResponse
 }
 
 object RetrofitClient {
     val api: DramaApiService by lazy {
         Retrofit.Builder()
-            .baseUrl("https://dramabos.asia/api/")
+            .baseUrl("https://api.sonzaix.indevs.in/")
             .client(OkHttpClient.Builder()
                 .addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY))
                 .connectTimeout(30, TimeUnit.SECONDS)
@@ -296,212 +279,135 @@ object RetrofitClient {
 class DramaRepository {
     private val api = RetrofitClient.api
 
-    fun checkAppMaintenance() = flow {
-        try {
-            val url = "https://raw.githubusercontent.com/sonzaiekkusu/sonzaix-files/refs/heads/main/drama.json"
-            val res = api.checkMaintenance(url)
-            emit(Result.success(res))
-        } catch (e: Exception) {
-            emit(Result.failure(e))
-        }
-    }
-
-    private fun mapMeloloToDramaItem(m: MeloloItem): DramaItem {
+    private fun mapBookToDramaItem(book: MeloloBook): DramaItem {
         return DramaItem(
-            bookId = m.id,
-            bookName = m.name,
-            cover = m.cover,
-            introduction = m.intro,
-            playCount = "${m.episodes} Eps",
-            chapterCount = m.episodes,
-            tags = listOf(m.author),
+            bookId = book.dramaId,
+            bookName = book.dramaName,
+            cover = book.thumbUrl,
+            introduction = book.description,
+            playCount = book.watchValue,
+            chapterCount = book.episodeCount?.toIntOrNull() ?: 0,
+            tags = book.statInfos,
             timestamp = System.currentTimeMillis(),
-            source = "melolo"
+            source = "melolo",
+            isNew = book.isNewBook == "1"
         )
     }
 
-    fun getForYouCombined(page: Int, source: String) = flow {
+    fun getHome() = flow {
         try {
-            val resultList = mutableListOf<DramaItem>()
-
-            if (source == "dramabox" || source == "all") {
-                try {
-                    val dbList = api.getForYou(page).data?.list ?: emptyList()
-                    resultList.addAll(dbList)
-                } catch (e: Exception) { e.printStackTrace() }
-            }
-
-            if (source == "melolo" || source == "all") {
-                try {
-                    val meloloOffset = (page - 1) * 30
-                    val mList = api.getMeloloHome(meloloOffset).data?.map { mapMeloloToDramaItem(it) } ?: emptyList()
-                    resultList.addAll(mList)
-                } catch (e: Exception) { e.printStackTrace() }
-            }
-
-            if (page == 1 && source == "all") resultList.shuffle()
-
-            emit(Result.success(DramaListContainer(resultList, isMore = true, total = resultList.size)))
+            val res = api.getHome()
+            val list = res.homeData?.flatMap { it.books ?: emptyList() }?.map { mapBookToDramaItem(it) } ?: emptyList()
+            emit(Result.success(DramaListContainer(list, isMore = false, total = list.size)))
         } catch (e: Exception) {
             emit(Result.failure(e))
         }
     }
 
-    fun getNew(p: Int) = flow { try { emit(Result.success(api.getNew(p).data)) } catch(e:Exception){ emit(Result.failure(e)) } }
-    fun getRank(p: Int) = flow { try { emit(Result.success(api.getRank(p).data)) } catch(e:Exception){ emit(Result.failure(e)) } }
-
-    fun searchCombined(query: String, page: Int, useDramabox: Boolean, useMelolo: Boolean) = flow {
-        val finalResults = mutableListOf<DramaItem>()
-        var error: Throwable? = null
-
-        if (useDramabox) {
-            try {
-                val res = api.searchDrama(query, page).data
-                res?.list?.let { finalResults.addAll(it) }
-            } catch (e: Exception) { error = e }
-        }
-
-        if (useMelolo) {
-            try {
-                val offset = (page - 1) * 30
-                val res = api.searchMelolo(query, offset)
-                val mList = res.data?.map { mapMeloloToDramaItem(it) } ?: emptyList()
-                finalResults.addAll(mList)
-            } catch (e: Exception) { error = e }
-        }
-
-        if (finalResults.isNotEmpty()) {
-            emit(Result.success(DramaListContainer(finalResults, isMore = true)))
-        } else {
-            if (page == 1 && error != null && finalResults.isEmpty()) {
-                emit(Result.failure(error!!))
-            } else {
-                emit(Result.success(DramaListContainer(emptyList(), isMore = false)))
-            }
+    fun getPopuler() = flow {
+        try {
+            val res = api.getPopuler()
+            val list = res.populerData?.flatMap { it.books ?: emptyList() }?.map { mapBookToDramaItem(it) } ?: emptyList()
+            emit(Result.success(DramaListContainer(list, isMore = false, total = list.size)))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
         }
     }
 
-    fun getSuggestions(k: String) = flow { try { emit(Result.success(api.getSuggestions(k).data?.list)) } catch(e:Exception){ emit(Result.failure(e)) } }
-
-    fun getDetail(id: String, source: String) = flow {
+    fun search(query: String, page: Int) = flow {
         try {
-            if (source == "melolo") {
-                val mData = api.getMeloloDetail(id)
-                if (!mData.id.isNullOrEmpty()) {
-                    val chapters = mData.videos?.map { v ->
-                        Chapter(
-                            chapterId = v.vid,
-                            chapterIndex = v.episode - 1,
-                            chapterName = "Episode ${v.episode}",
-                            isCharge = 0,
-                            vid = v.vid,
-                            durationSeconds = v.duration
-                        )
-                    } ?: emptyList()
+            val res = api.search(query, page = page)
+            val list = res.searchData?.flatMap { it.books ?: emptyList() }?.map { mapBookToDramaItem(it) } ?: emptyList()
+            // Assume if list is not empty, there might be more pages, although API doesn't explicitly say total pages.
+            // But usually search APIs behave this way.
+            emit(Result.success(DramaListContainer(list, isMore = list.isNotEmpty())))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
 
-                    val detail = DramaDetail(
-                        bookId = mData.id,
-                        bookName = mData.title ?: "",
-                        cover = mData.cover ?: "",
-                        introduction = mData.intro ?: "",
-                        tags = listOf("Melolo"),
-                        chapterList = chapters,
-                        source = "melolo"
+    // Detail API doesn't return info like name, cover, intro. We need to handle this.
+    // UI might already have this info from the list.
+    // Ideally we should cache or pass it. But here we just fetch chapters.
+    fun getDetail(id: String) = flow {
+        try {
+            val res = api.getDetail(id)
+            val chapters = res.videoList?.map { ep ->
+                Chapter(
+                    chapterId = ep.videoId,
+                    chapterIndex = ep.episode - 1, // 1-based to 0-based
+                    chapterName = "Episode ${ep.episode}",
+                    isCharge = 0,
+                    vid = ep.videoId,
+                    durationSeconds = ep.duration
+                )
+            } ?: emptyList()
+
+            // Since API detail doesn't return book metadata, we return placeholder or what we have.
+            // In the ViewModel/UI we might need to rely on passed arguments or cached data for Name/Cover.
+            // But let's check if we can get it from somewhere else? No.
+            // We will return empty strings for metadata and hope UI handles it or uses passed args.
+            val detail = DramaDetail(
+                bookId = id,
+                bookName = "", // Missing in API
+                cover = "", // Missing in API
+                introduction = "", // Missing in API
+                tags = emptyList(),
+                chapterList = chapters,
+                source = "melolo"
+            )
+            emit(Result.success(detail))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
+
+    fun getVideo(bookId: String, index: Int, bookName: String) = flow {
+        try {
+            // We need to find the video ID for the given index.
+            // So we first fetch detail to get the list, then find the video ID.
+            val detailRes = api.getDetail(bookId)
+            val targetEp = detailRes.videoList?.find { (it.episode - 1) == index }
+
+            if (targetEp != null) {
+                val streamRes = api.getStream(targetEp.videoId)
+
+                val qualities = streamRes.qualities?.map { q ->
+                    // Extract numeric quality from label (e.g., "720p" -> 720)
+                    val qInt = q.label.filter { it.isDigit() }.toIntOrNull() ?: 480
+                    VideoQuality(qInt, q.url, 0)
+                } ?: emptyList()
+
+                // Try to find a default URL if qualities are empty but we have a url in qualities?
+                // The JSON shows `qualities` list with `url`.
+                // There is no top-level `url` in stream response example, only `video_id`, `duration`, `poster`.
+                // Wait, look at JSON example for stream:
+                /*
+                {
+                  ...
+                  "qualities": [ ... ]
+                }
+                */
+                // So we rely on qualities.
+
+                val finalUrl = qualities.firstOrNull()?.videoPath ?: ""
+
+                if (finalUrl.isNotEmpty()) {
+                     val videoData = VideoData(
+                        bookId = bookId,
+                        chapterIndex = index,
+                        videoUrl = finalUrl,
+                        cover = streamRes.poster,
+                        qualities = qualities
                     )
-                    emit(Result.success(detail))
+                    emit(Result.success(videoData))
                 } else {
-                    emit(Result.failure(Exception("Data Melolo kosong/tidak valid")))
+                    emit(Result.failure(Exception("Stream URL not found")))
                 }
+
             } else {
-                val detailRes = api.getDetail(id).data
-                if (detailRes != null) {
-                    val chapterRes = try { api.getChapters(id).data.chapterList } catch(_:Exception) { detailRes.chapterList }
-                    emit(Result.success(detailRes.copy(chapterList = chapterRes, source = "dramabox")))
-                } else {
-                    emit(Result.failure(Exception("Data kosong")))
-                }
+                emit(Result.failure(Exception("Episode not found")))
             }
-        } catch (e: Exception) {
-            emit(Result.failure(e))
-        }
-    }
-
-    fun getVideo(bookId: String, index: Int, source: String) = flow {
-        try {
-            if (source == "melolo") {
-                val detailRes = api.getMeloloDetail(bookId)
-                val targetVideo = detailRes.videos?.find { (it.episode - 1) == index }
-
-                if (targetVideo != null) {
-                    val vidRes = api.getMeloloVideo(targetVideo.vid)
-                    val qualities = mutableListOf<VideoQuality>()
-
-                    if (!vidRes.url.isNullOrBlank()) {
-                        qualities.add(VideoQuality(1080, vidRes.url, 1))
-                    }
-                    if (!vidRes.backup.isNullOrBlank()) {
-                        qualities.add(VideoQuality(720, vidRes.backup, 0))
-                    }
-                    vidRes.list?.forEach { q ->
-                        val qInt = q.definition.filter { it.isDigit() }.toIntOrNull() ?: 480
-                        if (q.url.isNotBlank()) {
-                            qualities.add(VideoQuality(qInt, q.url, 0))
-                        }
-                    }
-
-                    val finalUrl = when {
-                        !vidRes.url.isNullOrBlank() -> vidRes.url
-                        !vidRes.backup.isNullOrBlank() -> vidRes.backup
-                        qualities.isNotEmpty() -> qualities.first().videoPath
-                        else -> ""
-                    }
-
-                    val uniqueQualities = qualities.distinctBy { it.quality }
-
-                    if (finalUrl.isNotEmpty()) {
-                        val videoData = VideoData(
-                            bookId = bookId,
-                            chapterIndex = index,
-                            videoUrl = finalUrl,
-                            cover = detailRes.cover,
-                            qualities = uniqueQualities
-                        )
-                        emit(Result.success(videoData))
-                    } else {
-                        emit(Result.failure(Exception("URL Video tidak tersedia/kosong")))
-                    }
-                } else {
-                    emit(Result.failure(Exception("Episode tidak ditemukan")))
-                }
-            } else {
-                val res = api.getVideoUrl(bookId, index).data
-                if (res != null) {
-                    if (res.videoUrl.isNotBlank() || !res.qualities.isNullOrEmpty()) {
-                        emit(Result.success(res))
-                    } else {
-                        emit(Result.failure(Exception("Link video dramabox kosong")))
-                    }
-                }
-                else emit(Result.failure(Exception("Gagal load video")))
-            }
-        } catch (e: Exception) {
-            emit(Result.failure(e))
-        }
-    }
-
-    fun checkMonitorStatus() = flow {
-        try {
-            val res = api.checkMonitor()
-            emit(Result.success(res))
-        } catch (e: Exception) {
-            emit(Result.failure(e))
-        }
-    }
-
-    fun checkMeloloStatus() = flow {
-        try {
-            val res = api.checkMeloloHealth()
-            emit(Result.success(res))
         } catch (e: Exception) {
             emit(Result.failure(e))
         }

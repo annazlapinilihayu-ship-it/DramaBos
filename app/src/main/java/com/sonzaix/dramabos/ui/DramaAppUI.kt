@@ -163,63 +163,7 @@ fun playSmart(navController: NavController, item: DramaItem, historyList: List<L
     val targetIndex = historyItem?.chapterIndex ?: 0
     val targetPos = historyItem?.position ?: 0L
     vm.saveToHistory(LastWatched(item.bookId, item.bookName, targetIndex, item.cover, System.currentTimeMillis(), item.source, targetPos))
-    navController.navigate("detail/${item.bookId}/${item.source}")
-}
-
-
-@Composable
-fun FilterFloatingButton(
-    currentFilter: String,
-    onFilterSelected: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
-        FloatingActionButton(
-            onClick = { expanded = true },
-            containerColor = PrimaryColor,
-            contentColor = Color.White,
-            shape = CircleShape,
-            modifier = Modifier
-                .padding(16.dp)
-                .shadow(16.dp, CircleShape)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.2f), Color.Transparent),
-                            center = Offset(24f, 24f),
-                            radius = 48f
-                        ),
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Rounded.FilterList, contentDescription = "Filter")
-            }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(CardBackground).shadow(12.dp, RoundedCornerShape(16.dp))
-        ) {
-            DropdownMenuItem(
-                text = { Text("Semua", color = if (currentFilter == "all") PrimaryColor else TextWhite) },
-                onClick = { onFilterSelected("all"); expanded = false }
-            )
-            DropdownMenuItem(
-                text = { Text("Dramabox", color = if (currentFilter == "dramabox") PrimaryColor else TextWhite) },
-                onClick = { onFilterSelected("dramabox"); expanded = false }
-            )
-            DropdownMenuItem(
-                text = { Text("Melolo", color = if (currentFilter == "melolo") MeloloColor else TextWhite) },
-                onClick = { onFilterSelected("melolo"); expanded = false }
-            )
-        }
-    }
+    navController.navigate("detail/${item.bookId}")
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -277,9 +221,8 @@ fun HeroCarousel(
                         .padding(20.dp)
                         .fillMaxWidth()
                 ) {
-                    val isMelolo = item.source == "melolo"
-                    val sourceColor = if (isMelolo) MeloloColor else PrimaryColor
-                    val sourceName = if (isMelolo) "MELOLO" else "DRAMABOX"
+                    val sourceColor = MeloloColor
+                    val sourceName = "MELOLO"
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -389,8 +332,6 @@ fun DramaApp(
         val showBottomBar = currentRoute in listOf("foryou", "new", "rank", "search", "library")
         val context = LocalContext.current
 
-        val isDramaboxDown by mainVM.isDramaboxDown.collectAsState()
-        val isMeloloDown by mainVM.isMeloloDown.collectAsState()
         val isMaintenance by mainVM.isMaintenance.collectAsState()
 
         if (isMaintenance) {
@@ -425,34 +366,6 @@ fun DramaApp(
             )
         }
 
-        if (isDramaboxDown && !isMaintenance) {
-            AlertDialog(
-                onDismissRequest = { },
-                title = { Text(text = "Informasi", fontWeight = FontWeight.Bold, color = TextWhite) },
-                text = { Text(text = "Server API Dramabox sedang gangguan !!!", color = TextGray) },
-                confirmButton = {
-                    TextButton(onClick = { mainVM.checkApiStatus() }) {
-                        Text("Coba Lagi", color = PrimaryColor)
-                    }
-                },
-                containerColor = CardBackground
-            )
-        }
-
-        if (isMeloloDown && !isMaintenance) {
-            AlertDialog(
-                onDismissRequest = { },
-                title = { Text(text = "Informasi", fontWeight = FontWeight.Bold, color = TextWhite) },
-                text = { Text(text = "Server API Melolo sedang gangguan !!!", color = TextGray) },
-                confirmButton = {
-                    TextButton(onClick = { mainVM.checkApiStatus() }) {
-                        Text("Coba Lagi", color = PrimaryColor)
-                    }
-                },
-                containerColor = CardBackground
-            )
-        }
-
         Scaffold(
             bottomBar = { if (showBottomBar) BottomNavBar(navController) },
             containerColor = DarkBackground
@@ -469,31 +382,27 @@ fun DramaApp(
                 composable("library") { LibraryScreen(navController) }
 
                 composable(
-                    route = "detail/{bookId}/{source}",
+                    route = "detail/{bookId}",
                     arguments = listOf(
-                        navArgument("bookId") { type = NavType.StringType },
-                        navArgument("source") { type = NavType.StringType; defaultValue = "dramabox" }
+                        navArgument("bookId") { type = NavType.StringType }
                     )
                 ) { backStackEntry ->
                     val bookId = backStackEntry.arguments?.getString("bookId") ?: ""
-                    val source = backStackEntry.arguments?.getString("source") ?: "dramabox"
-                    DetailPlayerScreen(navController, bookId, source)
+                    DetailPlayerScreen(navController, bookId, "melolo") // Default to melolo
                 }
 
                 composable(
-                    route = "player_full/{bookId}/{index}/{bookName}/{source}",
+                    route = "player_full/{bookId}/{index}/{bookName}",
                     arguments = listOf(
                         navArgument("bookId") { type = NavType.StringType },
                         navArgument("index") { type = NavType.IntType },
-                        navArgument("bookName") { type = NavType.StringType },
-                        navArgument("source") { type = NavType.StringType; defaultValue = "dramabox" }
+                        navArgument("bookName") { type = NavType.StringType }
                     )
                 ) { backStackEntry ->
                     val bookId = backStackEntry.arguments?.getString("bookId") ?: ""
                     val index = backStackEntry.arguments?.getInt("index") ?: 0
                     val bookName = backStackEntry.arguments?.getString("bookName") ?: ""
-                    val source = backStackEntry.arguments?.getString("source") ?: "dramabox"
-                    PlayerScreen(navController, bookId, index, bookName, source)
+                    PlayerScreen(navController, bookId, index, bookName, "melolo") // Default to melolo
                 }
             }
         }
@@ -592,7 +501,6 @@ fun SplashScreen() {
 @Composable
 fun ForYouScreen(nav: NavController, vm: ForYouViewModel = viewModel(), historyVM: HistoryViewModel = viewModel()) {
     val historyList by historyVM.historyList.collectAsState(initial = emptyList())
-    val currentSource by vm.currentSource.collectAsState()
     val items by vm.items.collectAsState()
     val state by vm.uiState.collectAsState()
     val listState = rememberLazyGridState()
@@ -647,12 +555,6 @@ fun ForYouScreen(nav: NavController, vm: ForYouViewModel = viewModel(), historyV
                 if (state is UiState.Loading) {
                     item(span = { GridItemSpan(3) }) { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp), color = PrimaryColor) } }
                 }
-            }
-        }
-
-        Box(Modifier.align(Alignment.BottomEnd)) {
-            FilterFloatingButton(currentFilter = currentSource) { selected ->
-                vm.setSourceFilter(selected)
             }
         }
     }
@@ -743,9 +645,8 @@ fun PaginatedGrid(
 
 @Composable
 fun DramaCard(drama: DramaItem, onClick: () -> Unit) {
-    val isMelolo = drama.source == "melolo"
-    val sourceColor = if (isMelolo) MeloloColor else PrimaryColor
-    val sourceName = if (isMelolo) "Melolo" else "Dramabox"
+    val sourceColor = MeloloColor
+    val sourceName = "Melolo"
     val epCount = drama.chapterCount ?: 0
     val playCount = drama.playCount ?: ""
 
@@ -853,7 +754,7 @@ fun SearchScreen(nav: NavController, vm: SearchViewModel = viewModel(), historyV
     val suggestions by vm.suggestions.collectAsState()
     val searchState by vm.searchState.collectAsState()
     val historyList by historyVM.historyList.collectAsState(initial = emptyList())
-    val currentFilter by vm.filterState.collectAsState()
+    // Removed filter logic
 
     val listState = rememberLazyGridState()
     val shouldLoadMore = remember {
@@ -943,12 +844,6 @@ fun SearchScreen(nav: NavController, vm: SearchViewModel = viewModel(), historyV
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = PrimaryColor) }
             }
         }
-
-        Box(Modifier.align(Alignment.BottomEnd)) {
-            FilterFloatingButton(currentFilter = currentFilter) { selected ->
-                vm.setFilter(selected)
-            }
-        }
     }
 }
 
@@ -957,7 +852,7 @@ fun SearchScreen(nav: NavController, vm: SearchViewModel = viewModel(), historyV
 fun DetailPlayerScreen(
     nav: NavController,
     bookId: String,
-    source: String,
+    source: String, // Kept but ignored/defaulted
     detailVM: DetailViewModel = viewModel(),
     playerVM: PlayerViewModel = viewModel(),
     historyVM: HistoryViewModel = viewModel(),
@@ -1054,7 +949,7 @@ fun DetailPlayerScreen(
                 val historyIndex = historyItem?.chapterIndex
                 val fallbackIndex = d.chapterList.minByOrNull { it.chapterIndex }?.chapterIndex ?: 0
                 val hasValidHistory = historyIndex != null && d.chapterList.any { it.chapterIndex == historyIndex }
-                currentEpIndex = if (hasValidHistory) historyIndex!! else fallbackIndex
+                currentEpIndex = if (hasValidHistory) historyIndex else fallbackIndex
                 initialSeekPosition = historyItem?.position ?: 0L
                 initialLoadDone = true
             }
@@ -1109,7 +1004,7 @@ fun DetailPlayerScreen(
             val pos = exoPlayer.currentPosition
             historyVM.saveToHistory(LastWatched(d.bookId, d.bookName, currentEpIndex, d.cover, System.currentTimeMillis(), d.source, pos))
             exoPlayer.pause()
-            nav.navigate("player_full/$bookId/$currentEpIndex/$encodedName/$source")
+            nav.navigate("player_full/$bookId/$currentEpIndex/$encodedName") // Removed source
         }
     }
 
@@ -1160,8 +1055,8 @@ fun DetailPlayerScreen(
                                     Text(d.bookName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = TextWhite)
                                     Spacer(Modifier.height(8.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        val sourceColor = if (d.source == "melolo") MeloloColor else PrimaryColor
-                                        val sourceText = if (d.source == "melolo") "MELOLO" else "DRAMABOX"
+                                        val sourceColor = MeloloColor
+                                        val sourceText = "MELOLO"
                                         Text(text = sourceText, style = MaterialTheme.typography.labelSmall, color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.background(sourceColor, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
                                         Spacer(Modifier.width(8.dp)); Text("${d.chapterList.size} Episode", color = TextGray, fontSize = 12.sp)
                                         Spacer(Modifier.width(8.dp)); Text("•", color = TextGray)
@@ -1175,7 +1070,7 @@ fun DetailPlayerScreen(
                                     Spacer(Modifier.height(20.dp))
                                     d.tags?.let { tags -> if(tags.isNotEmpty()) { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { tags.forEach { tag -> Box(modifier = Modifier.border(1.dp, Color.Gray.copy(0.3f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 6.dp)) { Text(tag, color = TextGray, fontSize = 12.sp) } } }; Spacer(Modifier.height(16.dp)) } }
                                     Text("Sinopsis", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextWhite)
-                                    Spacer(Modifier.height(4.dp)); Text(d.introduction, style = MaterialTheme.typography.bodyMedium, color = TextGray, lineHeight = 22.sp)
+                                    Spacer(Modifier.height(4.dp)); Text(d.introduction ?: "", style = MaterialTheme.typography.bodyMedium, color = TextGray, lineHeight = 22.sp)
                                     Spacer(Modifier.height(24.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                                         Text("Daftar Episode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextWhite)
@@ -1680,7 +1575,7 @@ fun LibraryScreen(
                             },
                             onClick = {
                                 if (isSelectionMode) toggleSelection(item.bookId)
-                                else navController.navigate("detail/${item.bookId}/${item.source}")
+                                else navController.navigate("detail/${item.bookId}")
                             }
                         )
                     }
@@ -1706,7 +1601,7 @@ fun LibraryScreen(
                             },
                             onClick = {
                                 if (isSelectionMode) toggleSelection(item.bookId)
-                                else navController.navigate("detail/${item.bookId}/${item.source}")
+                                else navController.navigate("detail/${item.bookId}")
                             }
                         )
                     }
@@ -1789,7 +1684,7 @@ fun SelectableHistoryItem(
                         Text(decodedName, maxLines = 2, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, overflow = TextOverflow.Ellipsis, color = TextWhite, lineHeight = 18.sp)
                         Spacer(Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(if (item.source == "melolo") "MELOLO" else "DRAMABOX", style = MaterialTheme.typography.labelSmall, color = if (item.source == "melolo") MeloloColor else Color(0xFFE91E63), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("MELOLO", style = MaterialTheme.typography.labelSmall, color = MeloloColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Text(" • Episode ${item.chapterIndex + 1}", style = MaterialTheme.typography.bodySmall, color = TextGray, fontSize = 11.sp)
                         }
                     }
@@ -1843,7 +1738,7 @@ fun SelectableFavoriteItem(
                     Text(item.bookName, maxLines = 2, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, overflow = TextOverflow.Ellipsis, color = TextWhite)
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (item.source == "melolo") "Melolo" else "Dramabox", style = MaterialTheme.typography.labelSmall, color = if (item.source == "melolo") MeloloColor else Color(0xFFE91E63), fontWeight = FontWeight.Bold, modifier = Modifier.border(1.dp, if (item.source == "melolo") MeloloColor else Color(0xFFE91E63), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+                        Text("Melolo", style = MaterialTheme.typography.labelSmall, color = MeloloColor, fontWeight = FontWeight.Bold, modifier = Modifier.border(1.dp, MeloloColor, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
                         if (item.totalEpisodes > 0) { Spacer(Modifier.width(8.dp)); Text("${item.totalEpisodes} Episode", style = MaterialTheme.typography.bodySmall, color = TextGray, fontSize = 11.sp) }
                     }
                 }
@@ -2045,8 +1940,8 @@ fun FavoriteItemCard(item: FavoriteDrama, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.height(8.dp))
 
-                val sourceName = if (item.source.equals("melolo", ignoreCase = true)) "Melolo" else "Dramabox"
-                val sourceColor = if (item.source.equals("melolo", ignoreCase = true)) MeloloColor else Color(0xFFE91E63)
+                val sourceName = "Melolo"
+                val sourceColor = MeloloColor
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -2148,8 +2043,8 @@ fun HistoryItemCard(item: LastWatched, onClick: () -> Unit) {
                     )
                     Spacer(Modifier.height(4.dp))
 
-                    val sourceName = if (item.source.equals("melolo", ignoreCase = true)) "Melolo" else "Dramabox"
-                    val sourceColor = if (item.source.equals("melolo", ignoreCase = true)) MeloloColor else Color(0xFFE91E63)
+                    val sourceName = "Melolo"
+                    val sourceColor = MeloloColor
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(

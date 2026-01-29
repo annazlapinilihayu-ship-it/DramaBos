@@ -35,8 +35,8 @@ open class PaginatedViewModel(private val fetcher: suspend (Int) -> Flow<Result<
                     val newItems = res?.list ?: emptyList()
                     if (newItems.isNotEmpty()) {
                         _items.value += newItems
-                        isLastPage = false
-                        currentPage++
+                        isLastPage = !res!!.isMore // Update isLastPage based on isMore flag from repository
+                        if (!isLastPage) currentPage++
                         _uiState.value = UiState.Success(true)
                     } else {
                         isLastPage = true
@@ -51,118 +51,27 @@ open class PaginatedViewModel(private val fetcher: suspend (Int) -> Flow<Result<
     }
 }
 
-class ForYouViewModel : ViewModel() {
-    private val repo = DramaRepository()
-    private val _items = MutableStateFlow<List<DramaItem>>(emptyList())
-    val items = _items.asStateFlow()
-    private val _uiState = MutableStateFlow<UiState<Boolean>>(UiState.Loading)
-    val uiState = _uiState.asStateFlow()
+class ForYouViewModel : PaginatedViewModel({ page -> DramaRepository().getHome() })
 
-    private val _currentSource = MutableStateFlow("all")
-    val currentSource = _currentSource.asStateFlow()
-
-    private var currentPage = 1
-    private var isLastPage = false
-    private var isLoading = false
-
-    init {
-        loadNextPage()
-    }
-
-    fun setSourceFilter(source: String) {
-        if (_currentSource.value != source) {
-            _currentSource.value = source
-            currentPage = 1
-            _items.value = emptyList()
-            isLastPage = false
-            _uiState.value = UiState.Loading
-            loadNextPage()
+// For NewViewModel, we use getHome() and filter for new items.
+class NewViewModel : PaginatedViewModel({ page ->
+    DramaRepository().getHome().map { result ->
+        result.map { container ->
+            // Filter only new items
+            val filtered = container.list.filter { it.isNew }
+            container.copy(list = filtered, total = filtered.size)
         }
     }
+})
 
-    fun loadNextPage() {
-        if (isLoading || isLastPage) return
-        viewModelScope.launch {
-            isLoading = true
-            if (_items.value.isEmpty()) _uiState.value = UiState.Loading
-
-            repo.getForYouCombined(currentPage, _currentSource.value).collect { result ->
-                result.onSuccess { res ->
-                    val newItems = res?.list ?: emptyList()
-                    if (newItems.isNotEmpty()) {
-                        _items.value += newItems
-                        isLastPage = false
-                        currentPage++
-                        _uiState.value = UiState.Success(true)
-                    } else {
-                        isLastPage = true
-                        if (_items.value.isEmpty()) _uiState.value = UiState.Error("Data kosong")
-                    }
-                }.onFailure {
-                    if (_items.value.isEmpty()) _uiState.value = UiState.Error(it.message ?: "Error")
-                }
-                isLoading = false
-            }
-        }
-    }
-}
-
-class NewViewModel : PaginatedViewModel({ page -> DramaRepository().getNew(page) })
-
-class RankViewModel : PaginatedViewModel({ page -> DramaRepository().getRank(page) })
+class RankViewModel : PaginatedViewModel({ page -> DramaRepository().getPopuler() })
 
 class MainViewModel : ViewModel() {
-    private val _isDramaboxDown = MutableStateFlow(false)
-    val isDramaboxDown = _isDramaboxDown.asStateFlow()
-
-    private val _isMeloloDown = MutableStateFlow(false)
-    val isMeloloDown = _isMeloloDown.asStateFlow()
-
+    // Removed Dramabox specific checks.
     private val _isMaintenance = MutableStateFlow(false)
     val isMaintenance = _isMaintenance.asStateFlow()
 
-    init {
-        checkApiStatus()
-        checkMaintenanceMode()
-    }
-
-    fun checkMaintenanceMode() {
-        viewModelScope.launch {
-            DramaRepository().checkAppMaintenance().collect { result ->
-                result.onSuccess {
-                    _isMaintenance.value = it.isMT.equals("yes", ignoreCase = true)
-                }.onFailure {
-                    _isMaintenance.value = false
-                }
-            }
-        }
-    }
-
-    fun checkApiStatus() {
-        viewModelScope.launch {
-            val repo = DramaRepository()
-
-            launch {
-                repo.checkMonitorStatus().collect { result ->
-                    result.onSuccess { response ->
-                        _isDramaboxDown.value = response.status != "online"
-                    }.onFailure {
-                        _isDramaboxDown.value = true
-                    }
-                }
-            }
-
-            launch {
-                repo.checkMeloloStatus().collect { result ->
-                    result.onSuccess { response ->
-                        _isMeloloDown.value = response.status != "ok"
-                    }.onFailure {
-                        _isMeloloDown.value = true
-                    }
-                }
-            }
-        }
-    }
+    // We can add a generic connectivity check here if needed, but for now we keep it simple.
 }
 
 class SearchViewModel : ViewModel() {
@@ -170,8 +79,7 @@ class SearchViewModel : ViewModel() {
     private val _queryText = MutableStateFlow("")
     val queryText = _queryText.asStateFlow()
 
-    private val _filterState = MutableStateFlow("all") 
-    val filterState = _filterState.asStateFlow()
+    // Removed filterState as we only have Melolo now.
 
     private val _suggestions = MutableStateFlow<List<DramaItem>>(emptyList())
     val suggestions = _suggestions.asStateFlow()
@@ -186,26 +94,14 @@ class SearchViewModel : ViewModel() {
     private var isLastPage = false
     private var isLoading = false
 
-    fun setFilter(filter: String) {
-        if (_filterState.value != filter) {
-            _filterState.value = filter
-            if (currentQuery.isNotEmpty()) {
-                performSearch(currentQuery)
-            }
-        }
-    }
+    // Removed setFilter
 
     fun onQueryChange(q: String) {
         _queryText.value = q
-        searchJob?.cancel()
-        if (q.length > 2) {
-            searchJob = viewModelScope.launch {
-                delay(800)
-                repo.getSuggestions(q).collect { r ->
-                    r.onSuccess { _suggestions.value = it ?: emptyList() }.onFailure { _suggestions.value = emptyList() }
-                }
-            }
-        } else { _suggestions.value = emptyList() }
+        // Removed suggestion logic as API doesn't support specific suggestion endpoint,
+        // and using search for suggestions might be too heavy or duplicate logic.
+        // We can just clear suggestions.
+        _suggestions.value = emptyList()
     }
 
     fun performSearch(q: String) {
@@ -224,19 +120,15 @@ class SearchViewModel : ViewModel() {
     fun loadMoreSearch() {
         if (isLastPage || currentQuery.isEmpty() || isLoading) return
 
-        val currentFilter = _filterState.value
-        val useDramabox = currentFilter == "all" || currentFilter == "dramabox"
-        val useMelolo = currentFilter == "all" || currentFilter == "melolo"
-
         isLoading = true
         viewModelScope.launch {
-            repo.searchCombined(currentQuery, currentPage, useDramabox, useMelolo).collect { r ->
+            repo.search(currentQuery, currentPage).collect { r ->
                 r.onSuccess { res ->
                     isLoading = false
                     val newItems = res.list
                     if (newItems.isNotEmpty()) {
                         _searchResult.value += newItems
-                        currentPage++
+                        if (res.isMore) currentPage++ else isLastPage = true
                         _searchState.value = UiState.Success(true)
                     } else { isLastPage = true }
                 }.onFailure {
@@ -254,10 +146,10 @@ class DetailViewModel : ViewModel() {
     private val _detailState = MutableStateFlow<UiState<DramaDetail>>(UiState.Loading)
     val detailState = _detailState.asStateFlow()
 
-    fun loadDetail(id: String, source: String = "dramabox") {
+    fun loadDetail(id: String, source: String = "melolo") {
         viewModelScope.launch {
             _detailState.value = UiState.Loading
-            DramaRepository().getDetail(id, source).collect { result ->
+            DramaRepository().getDetail(id).collect { result ->
                 result.onSuccess {
                     _detailState.value = UiState.Success(it)
                 }.onFailure {
@@ -272,10 +164,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _videoState = MutableStateFlow<UiState<VideoData>>(UiState.Loading)
     val videoState = _videoState.asStateFlow()
 
-    fun loadVideo(id: String, idx: Int, name: String, source: String = "dramabox") {
+    fun loadVideo(id: String, idx: Int, name: String, source: String = "melolo") {
         viewModelScope.launch {
             _videoState.value = UiState.Loading
-            DramaRepository().getVideo(id, idx, source).collect { r ->
+            DramaRepository().getVideo(id, idx, name).collect { r ->
                 r.onSuccess {
                     _videoState.value = UiState.Success(it)
                     saveHistory(id, name, idx, it.cover, source)
