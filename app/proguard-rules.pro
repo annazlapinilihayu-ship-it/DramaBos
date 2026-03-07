@@ -2,9 +2,9 @@
 -keepattributes *Annotation*
 -keepattributes Signature
 -keepattributes InnerClasses,EnclosingMethod
--keep class com.sonzaix.dramabos.data.** { *; }
--keep interface com.sonzaix.dramabos.data.DramaApiService { *; }
--keep class com.sonzaix.dramabos.viewmodel.** { *; }
+-keep class com.sonzaix.shortxrama.data.** { *; }
+-keep interface com.sonzaix.shortxrama.data.DramaApiService { *; }
+-keep class com.sonzaix.shortxrama.viewmodel.** { *; }
 -keep class sun.misc.Unsafe { *; }
 -keep class com.google.gson.stream.** { *; }
 -dontwarn okhttp3.**
@@ -15,3 +15,9 @@
 -dontwarn androidx.**
 -keep class androidx.appcompat.widget.** { *; }
 -dontwarn androidx.media3.**
+
+# Keep WorkManager/Room implementation used via reflection at startup
+-keep class androidx.work.impl.WorkDatabase_Impl { <init>(...); }
+-keep class androidx.work.impl.** { *; }
+-keep class androidx.work.** { *; }
+-keepclassmembers class * extends androidx.room.RoomDatabase { <init>(...); }
